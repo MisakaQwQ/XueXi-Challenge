@@ -16,6 +16,7 @@ from ocr.cn_ocr import CnOcr
 
 all_questions = []
 ocr = CnOcr()
+MODE = 2
 
 
 class OCR_backend(QThread):
@@ -155,7 +156,7 @@ class Main_backend(QThread):
 
     def __init__(self, parent=None):
         super(Main_backend, self).__init__(parent)
-        self.tpl1 = cv2.imread("data/Pos1.png")
+        self.tpl1 = cv2.imread("data/Pos%d.png"%MODE)
 
     def start_ocr(self):
         self.ocr_block = True
@@ -192,11 +193,18 @@ class Main_backend(QThread):
         self.image = ImageQt.fromqimage(self.image)
         self.image = cv2.cvtColor(np.asarray(self.image), cv2.COLOR_RGB2BGR)
         self.image_wrap()
-        threshold = 0.97  # 定位点置信度
-        horizon_margin = 0.05
-        horizon_size = 0.85
-        vertical_margin = 0.16
-        vertical_size = 0.75
+        if MODE == 1:
+            threshold = 0.97  # 定位点置信度
+            horizon_margin = 0.05
+            horizon_size = 0.85
+            vertical_margin = 0.16
+            vertical_size = 0.75
+        elif MODE == 2 or MODE == 3:
+            threshold = 0.97  # 定位点置信度
+            horizon_margin = 0.05
+            horizon_size = 0.85
+            vertical_margin = 0.12
+            vertical_size = 0.5
         pos2 = [0, 0]
 
         if self.image.shape[0] > self.image.shape[1]:  # 判断竖屏状态
