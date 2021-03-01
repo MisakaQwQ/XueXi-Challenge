@@ -1,34 +1,58 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsPixmapItem
-from PyQt5.QtCore import QThread, pyqtSignal, QDateTime, QObject
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+
+from ocr.cn_ocr import CnOcr
+from qgmodel import *
+from ui import Ui_MainWindow
+
 import win32gui
 import sys
 import time
-from ui import Ui_MainWindow
+import math
+from functools import wraps
 from PIL import Image, ImageQt
 import cv2
 import numpy as np
-from qgmodel import *
 from playhouse.shortcuts import model_to_dict
 import difflib
-import math
-from ocr.cn_ocr import CnOcr
 
 all_questions = []
 ocr = CnOcr()
-MODE = 2
+
+
+def timer(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        ret = func(*args, **kwargs)
+        end = time.time()
+        print(func.__name__, end - start)
+        return ret
+    return wrapper
+
+
+def init():
+    db.connect()
+    try:
+        db.create_tables([Questions])
+    except Exception as e:
+        print(e)
+        pass
+    cursor = Questions.select()
+    for each in cursor:
+        all_questions.append(model_to_dict(each))
 
 
 class OCR_backend(QThread):
     update = pyqtSignal(str)
+    available = True
     ocr_text = ''
 
-    def __del__(self):
-        self.wait()
-
-    def __init__(self, parent=None, image=True):  # do_create_data放在最后
+    def __init__(self, parent=None):
         super(OCR_backend, self).__init__(parent)
-        self.image = image
+        self.mutex = QMutex()
+        self.cond = QWaitCondition()
 
     def search_db(self):
         def builder(font_size, color, font_family, content):
@@ -62,6 +86,7 @@ class OCR_backend(QThread):
                    'p, li { white-space: pre-wrap; }</style></head><body> %s </body></html>' % html
         self.update.emit('H' + end_html)
 
+    @timer
     def process(self):
         # 二值化
         ret, binary = cv2.threshold(self.image, 0, 255, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
@@ -110,27 +135,52 @@ class OCR_backend(QThread):
         cv2.imwrite('split.png', self.image.copy())
         self.update.emit('T' + self.ocr_text)
 
-    def run(self):
+    def start_working(self, image):
         try:
-            self.process()
+            self.available = False
+            self.image = image
+            self.cond.wakeAll()
         except Exception as e:
             print(e)
 
+    def run(self):
+        while True:
+            self.mutex.lock()
+            if self.available:
+                self.cond.wait(self.mutex)
+            else:
+                try:
+                    self.process()
+                except Exception as e:
+                    print(e)
+                self.available = True
+            self.msleep(100)
+            self.mutex.unlock()
+
 
 class Main_backend(QThread):
-    # 通过类成员对象定义信号
     update_img = pyqtSignal(QImage)
     update_txt = pyqtSignal(str)
-    hwnd = None
-    hwnd_stat = 0
+    update_rec = pyqtSignal(str)
+    update_ans = pyqtSignal(str)
     tpl1 = None
-    image = None
-    image_stat = None
-    image_content = None
-    image_content_now = None
+    mode = 1
 
     ocr_cnt = 0
     ocr_block = False
+
+    def __init__(self, parent=None):
+        super(Main_backend, self).__init__(parent)
+        self.tpl1 = cv2.imread("data/Pos1.png")
+        self.ocr_block = True
+        self.ocr_backend = OCR_backend(self)
+        self.ocr_backend.update.connect(self.handle_rtn)
+        self.ocr_backend.start()
+
+    def update_mode(self, mode):
+        self.mode = mode
+        self.tpl1 = cv2.imread("data/Pos%d.png" % self.mode)
+        pass
 
     def get_hwnd(self):
         def get_all_hwnd(hwnd, extra):
@@ -146,32 +196,23 @@ class Main_backend(QThread):
         for key, value in windows.items():
             if value[1] == 'CHWindow' and value[2] == '':
                 return value[0]
+        return -1
 
     def handle_rtn(self, data):
         self.ocr_block = False
         self.update_txt.emit(data)
 
-    def __del__(self):
-        self.wait()
+    def start_ocr(self, rec_image):
+        if self.ocr_backend.available:
+            self.ocr_backend.start_working(rec_image.copy())
 
-    def __init__(self, parent=None):
-        super(Main_backend, self).__init__(parent)
-        self.tpl1 = cv2.imread("data/Pos%d.png"%MODE)
-
-    def start_ocr(self):
-        self.ocr_block = True
-        self.image_content_now = self.image_content.copy()
-        self.ocr_backend = OCR_backend(self, self.image_content_now)
-        self.ocr_backend.update.connect(self.handle_rtn)
-        self.ocr_backend.start()
-
-    def image_wrap(self):
-        left_up = [0, self.image.shape[0] // 4]
-        right_bot = [self.image.shape[1] - 1, self.image.shape[0] - 1]
-        while self.image[left_up[1]][left_up[0]].tolist() == self.image[left_up[1] - 1][left_up[0]].tolist():
+    def image_wrap(self, image):
+        left_up = [0, image.shape[0] // 4]
+        right_bot = [image.shape[1] - 1, image.shape[0] - 1]
+        while image[left_up[1]][left_up[0]].tolist() == image[left_up[1] - 1][left_up[0]].tolist():
             left_up[1] -= 1
-        self.image = self.image[left_up[1] + 1:right_bot[1], 1:right_bot[0]]
-        new_image = cv2.cvtColor(self.image, cv2.COLOR_RGB2GRAY)
+        image = image[left_up[1] + 1:right_bot[1], 1:right_bot[0]]
+        new_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         col = new_image.mean(axis=0).tolist()
         left_up = [0, 0]
         right_bot = [0, new_image.shape[0]]
@@ -187,71 +228,66 @@ class Main_backend(QThread):
         bias = min(left_up[0], new_image.shape[1] - right_bot[0])
         left_up[0] = bias
         right_bot[0] = new_image.shape[1] - bias
-        self.image = self.image[left_up[1]:right_bot[1] + 1, left_up[0]:right_bot[0] + 1]
+        wrapped_image = image[left_up[1]:right_bot[1] + 1, left_up[0]:right_bot[0] + 1]
+        return wrapped_image
 
-    def image_process(self):
-        self.image = ImageQt.fromqimage(self.image)
-        self.image = cv2.cvtColor(np.asarray(self.image), cv2.COLOR_RGB2BGR)
-        self.image_wrap()
-        if MODE == 1:
+    @timer
+    def image_process(self, image):
+        wrapped_image = self.image_wrap(image)
+        if self.mode == 1:
             threshold = 0.97  # 定位点置信度
             horizon_margin = 0.05
             horizon_size = 0.85
             vertical_margin = 0.16
             vertical_size = 0.75
-        elif MODE == 2 or MODE == 3:
+        else:
             threshold = 0.97  # 定位点置信度
-            horizon_margin = 0.05
+            horizon_margin = 0.07
             horizon_size = 0.85
-            vertical_margin = 0.12
-            vertical_size = 0.5
+            vertical_margin = 0.06
+            vertical_size = 0.60
         pos2 = [0, 0]
 
-        if self.image.shape[0] > self.image.shape[1]:  # 判断竖屏状态
-            res = cv2.matchTemplate(self.image, self.tpl1, cv2.TM_CCOEFF_NORMED)
+        if wrapped_image.shape[0] > wrapped_image.shape[1]:  # 判断竖屏状态
+            res = cv2.matchTemplate(wrapped_image, self.tpl1, cv2.TM_CCOEFF_NORMED)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
             if res[max_loc[1]][max_loc[0]] > threshold and max_loc[0] < 40:  # 判断答题界面
                 pos1 = [max_loc[0], max_loc[1]]  # 主定位点
-                pos1[0] = pos1[0] + math.ceil(horizon_margin * self.image.shape[1])
-                pos1[1] = pos1[1] + math.ceil(vertical_margin * self.image.shape[0])
-                pos2[0] = pos1[0] + math.ceil(horizon_size * self.image.shape[1])
-                pos2[1] = pos1[1] + math.ceil(vertical_size * self.image.shape[0])
-                cv2.rectangle(self.image, tuple(pos1), tuple(pos2), (0, 255, 255), 2)
-                self.image_content = self.image[pos1[1] + 2:pos2[1] - 1, pos1[0] + 2:pos2[0] - 1]
-                self.image_content = cv2.cvtColor(self.image_content, cv2.COLOR_RGB2GRAY)
-                if self.ocr_cnt == 0 and self.ocr_block == False:
-                    self.start_ocr()
-            else:
-                self.image_content_now = None
-        self.image = Image.fromarray(cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB))
-        self.image = ImageQt.ImageQt(self.image)
+                pos1[0] = pos1[0] + math.ceil(horizon_margin * wrapped_image.shape[1])
+                pos1[1] = pos1[1] + math.ceil(vertical_margin * wrapped_image.shape[0])
+                pos2[0] = pos1[0] + math.ceil(horizon_size * wrapped_image.shape[1])
+                pos2[1] = pos1[1] + math.ceil(vertical_size * wrapped_image.shape[0])
+                cv2.rectangle(wrapped_image, tuple(pos1), tuple(pos2), (0, 255, 255), 2)
+                image_content = wrapped_image[pos1[1] + 2:pos2[1] - 1, pos1[0] + 2:pos2[0] - 1]
+                image_content = cv2.cvtColor(image_content, cv2.COLOR_RGB2GRAY)
+                self.start_ocr(image_content)
+        return wrapped_image
 
     # 处理业务逻辑
     def run(self):
+        hwnd = 0
         while True:
             try:
-                screen = QApplication.primaryScreen()
-                if self.hwnd == None:
-                    self.hwnd = self.get_hwnd()
-                    if self.hwnd == None:
-                        self.update_txt.emit('T句柄无效，请打开AirPlayer并连接')
-                        self.hwnd_stat = 0
-                        time.sleep(3)
-                self.image = screen.grabWindow(self.hwnd).toImage()
-                # self.image.save("screenshot.jpg")
-                try:
-                    ImageQt.fromqimage(self.image)
-                    if self.hwnd_stat == 0:
-                        self.update_txt.emit('T ')
-                    self.hwnd_stat = 1
-                except Exception as e:
-                    self.hwnd = None
+                if hwnd == 0:
+                    hwnd = self.get_hwnd()
+                if hwnd == -1:
+                    self.update_rec.emit('句柄无效，请打开AirPlayer并连接')
+                    time.sleep(1)
+                    hwnd = self.get_hwnd()
                     continue
-                self.image_process()
-                sender = self.image.copy()
-                self.update_img.emit(sender)
-                time.sleep(1 / 30)
-                self.ocr_cnt = (self.ocr_cnt + 1) % 15
+                screen = QApplication.primaryScreen()
+                try:
+                    raw_image = screen.grabWindow(hwnd).toImage()
+                    PIL_image = ImageQt.fromqimage(raw_image)
+                    CV_image = cv2.cvtColor(np.asarray(PIL_image), cv2.COLOR_RGB2BGR)
+                except Exception as e:
+                    hwnd = 0
+                    continue
+                labeled_image = self.image_process(CV_image)
+                labeled_image = Image.fromarray(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
+                labeled_image = ImageQt.ImageQt(labeled_image)
+                self.update_img.emit(labeled_image.copy())
+                time.sleep(1 / 15)
             except Exception as e:
                 print(e)
 
@@ -267,12 +303,24 @@ class my_ui(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(e)
 
+    def handleAns(self, data):
+        self.Ans.setText(data)
+
+    def handleRec(self, data):
+        self.Rec_out.setText(data)
+
     def __init__(self, parent=None):
         super(my_ui, self).__init__(parent)
+        self.setupUi(self)
         self.main_backend = Main_backend(self)
         # 连接信号
         self.main_backend.update_img.connect(self.handleDisplay)
         self.main_backend.update_txt.connect(self.handleOCR)
+        self.main_backend.update_rec.connect(self.handleRec)
+        self.main_backend.update_ans.connect(self.handleAns)
+        self.mode1.clicked.connect(lambda: self.main_backend.update_mode(1))
+        self.mode2.clicked.connect(lambda: self.main_backend.update_mode(2))
+        self.mode3.clicked.connect(lambda: self.main_backend.update_mode(3))
         # 开始线程
         self.main_backend.start()
 
@@ -291,19 +339,9 @@ class my_ui(QMainWindow, Ui_MainWindow):
 
 def run():
     try:
-        db.connect()
-        try:
-            db.create_tables([Questions])
-        except Exception as e:
-            print(e)
-            pass
-        cursor = Questions.select()
-        for each in cursor:
-            all_questions.append(model_to_dict(each))
+        init()
         app = QApplication(sys.argv)
-        main_window = QMainWindow()
-        ui = my_ui()
-        ui.setupUi(main_window)
+        main_window = my_ui()
     except Exception as e:
         print(e)
     main_window.show()

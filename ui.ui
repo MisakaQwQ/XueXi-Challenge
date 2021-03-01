@@ -19,7 +19,35 @@
      <widget class="QGraphicsView" name="img_out"/>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout" stretch="5,5">
+     <layout class="QVBoxLayout" name="verticalLayout" stretch="1,10,10">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QRadioButton" name="mode1">
+          <property name="text">
+           <string>挑战答题</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QRadioButton" name="mode2">
+          <property name="text">
+           <string>争上游答题</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QRadioButton" name="mode3">
+          <property name="text">
+           <string>双人对战</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
       <item>
        <widget class="QTextEdit" name="Rec_out">
         <property name="font">
