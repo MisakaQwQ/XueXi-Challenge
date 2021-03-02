@@ -19,7 +19,7 @@
      <widget class="QGraphicsView" name="img_out"/>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout" stretch="1,10,10">
+     <layout class="QVBoxLayout" name="verticalLayout" stretch="1,7,10">
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
@@ -49,7 +49,7 @@
        </layout>
       </item>
       <item>
-       <widget class="QTextEdit" name="Rec_out">
+       <widget class="QTextEdit" name="result">
         <property name="font">
          <font>
           <family>微软雅黑</family>
@@ -59,7 +59,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QTextBrowser" name="Ans">
+       <widget class="QTextBrowser" name="answer">
         <property name="html">
          <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;

@@ -4,13 +4,12 @@ from PyQt5.QtGui import *
 
 from ocr.cn_ocr import CnOcr
 from qgmodel import *
-from ui import Ui_MainWindow
+from UI.ui import Ui_MainWindow
+from function.common_function import *
 
-import win32gui
 import sys
 import time
 import math
-from functools import wraps
 from PIL import Image, ImageQt
 import cv2
 import numpy as np
@@ -19,17 +18,6 @@ import difflib
 
 all_questions = []
 ocr = CnOcr()
-
-
-def timer(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        ret = func(*args, **kwargs)
-        end = time.time()
-        print(func.__name__, end - start)
-        return ret
-    return wrapper
 
 
 def init():
@@ -44,8 +32,21 @@ def init():
         all_questions.append(model_to_dict(each))
 
 
+def find_closest_question(question):
+    target = [0, 0]
+    idx = 0
+    for each in all_questions:
+        tmp = difflib.SequenceMatcher(None, question, each['question']).quick_ratio()
+        if tmp > target[0]:
+            target[0] = tmp
+            target[1] = idx
+        idx += 1
+    return target
+
+
 class OCR_backend(QThread):
-    update = pyqtSignal(str)
+    update_rec = pyqtSignal(str)
+    update_ans = pyqtSignal(str)
     available = True
     ocr_text = ''
 
@@ -60,14 +61,8 @@ class OCR_backend(QThread):
                    % (font_size, color, font_family, content)
             return html
 
-        score = [0, 0]
-        cnt = 0
-        for each in all_questions:
-            tmp = difflib.SequenceMatcher(None, self.ocr_text, each['question']).quick_ratio()
-            if tmp > score[0]:
-                score[0] = tmp
-                score[1] = cnt
-            cnt += 1
+        score = find_closest_question(self.ocr_text)
+
         # if score[0] < 0.5:
         #     cv2.imwrite(str(time.time()) + '.png', self.image)
         html = builder(15, '#000000', '楷体', '置信度: %.2f' % score[0])
@@ -84,7 +79,7 @@ class OCR_backend(QThread):
         end_html = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">' \
                    '<html><head><meta name="qrichtext" content="1" /><style type="text/css">' \
                    'p, li { white-space: pre-wrap; }</style></head><body> %s </body></html>' % html
-        self.update.emit('H' + end_html)
+        self.update_ans.emit(end_html)
 
     @timer
     def process(self):
@@ -133,7 +128,7 @@ class OCR_backend(QThread):
             cnt += 1
             self.ocr_text += '\n'
         cv2.imwrite('split.png', self.image.copy())
-        self.update.emit('T' + self.ocr_text)
+        self.update_rec.emit(self.ocr_text)
 
     def start_working(self, image):
         try:
@@ -160,7 +155,6 @@ class OCR_backend(QThread):
 
 class Main_backend(QThread):
     update_img = pyqtSignal(QImage)
-    update_txt = pyqtSignal(str)
     update_rec = pyqtSignal(str)
     update_ans = pyqtSignal(str)
     tpl1 = None
@@ -174,7 +168,8 @@ class Main_backend(QThread):
         self.tpl1 = cv2.imread("data/Pos1.png")
         self.ocr_block = True
         self.ocr_backend = OCR_backend(self)
-        self.ocr_backend.update.connect(self.handle_rtn)
+        self.ocr_backend.update_rec.connect(self.handleRec)
+        self.ocr_backend.update_ans.connect(self.handleAns)
         self.ocr_backend.start()
 
     def update_mode(self, mode):
@@ -182,25 +177,12 @@ class Main_backend(QThread):
         self.tpl1 = cv2.imread("data/Pos%d.png" % self.mode)
         pass
 
-    def get_hwnd(self):
-        def get_all_hwnd(hwnd, extra):
-            windows = extra
-            temp = []
-            temp.append(hwnd)
-            temp.append(win32gui.GetClassName(hwnd))
-            temp.append(win32gui.GetWindowText(hwnd))
-            windows[hwnd] = temp
+    def handleAns(self, data):
+        self.update_ans.emit(data)
 
-        windows = {}
-        win32gui.EnumWindows(get_all_hwnd, windows)
-        for key, value in windows.items():
-            if value[1] == 'CHWindow' and value[2] == '':
-                return value[0]
-        return -1
-
-    def handle_rtn(self, data):
+    def handleRec(self, data):
         self.ocr_block = False
-        self.update_txt.emit(data)
+        self.update_rec.emit(data)
 
     def start_ocr(self, rec_image):
         if self.ocr_backend.available:
@@ -235,13 +217,13 @@ class Main_backend(QThread):
     def image_process(self, image):
         wrapped_image = self.image_wrap(image)
         if self.mode == 1:
-            threshold = 0.97  # 定位点置信度
+            threshold = 0.97
             horizon_margin = 0.05
             horizon_size = 0.85
             vertical_margin = 0.16
             vertical_size = 0.75
         else:
-            threshold = 0.97  # 定位点置信度
+            threshold = 0.97
             horizon_margin = 0.07
             horizon_size = 0.85
             vertical_margin = 0.06
@@ -263,17 +245,16 @@ class Main_backend(QThread):
                 self.start_ocr(image_content)
         return wrapped_image
 
-    # 处理业务逻辑
     def run(self):
         hwnd = 0
         while True:
             try:
                 if hwnd == 0:
-                    hwnd = self.get_hwnd()
+                    hwnd = get_hwnd()
                 if hwnd == -1:
                     self.update_rec.emit('句柄无效，请打开AirPlayer并连接')
                     time.sleep(1)
-                    hwnd = self.get_hwnd()
+                    hwnd = get_hwnd()
                     continue
                 screen = QApplication.primaryScreen()
                 try:
@@ -293,35 +274,24 @@ class Main_backend(QThread):
 
 
 class my_ui(QMainWindow, Ui_MainWindow):
-    def handleOCR(self, data):
-        try:
-            # print('OCR update')
-            if data[0] == 'T':
-                self.Rec_out.setText(data[1:])
-            if data[0] == 'H':
-                self.Ans.setText(data[1:])
-        except Exception as e:
-            print(e)
-
     def handleAns(self, data):
-        self.Ans.setText(data)
+        self.answer.setText(data)
 
     def handleRec(self, data):
-        self.Rec_out.setText(data)
+        self.result.setText(data)
 
     def __init__(self, parent=None):
         super(my_ui, self).__init__(parent)
         self.setupUi(self)
         self.main_backend = Main_backend(self)
-        # 连接信号
+
         self.main_backend.update_img.connect(self.handleDisplay)
-        self.main_backend.update_txt.connect(self.handleOCR)
         self.main_backend.update_rec.connect(self.handleRec)
         self.main_backend.update_ans.connect(self.handleAns)
         self.mode1.clicked.connect(lambda: self.main_backend.update_mode(1))
         self.mode2.clicked.connect(lambda: self.main_backend.update_mode(2))
         self.mode3.clicked.connect(lambda: self.main_backend.update_mode(3))
-        # 开始线程
+
         self.main_backend.start()
 
     def handleDisplay(self, data):
@@ -330,7 +300,7 @@ class my_ui(QMainWindow, Ui_MainWindow):
             pix = QPixmap.fromImage(data)
             self.item = QGraphicsPixmapItem(pix)
             self.item.setScale(zoomscale)
-            self.scene = QGraphicsScene()  # 创建场景
+            self.scene = QGraphicsScene()
             self.scene.addItem(self.item)
             self.img_out.setScene(self.scene)
         except Exception as e:

@@ -37,18 +37,18 @@ class Ui_MainWindow(object):
         self.mode3.setObjectName("mode3")
         self.horizontalLayout_2.addWidget(self.mode3)
         self.verticalLayout.addLayout(self.horizontalLayout_2)
-        self.Rec_out = QtWidgets.QTextEdit(self.centralwidget)
+        self.result = QtWidgets.QTextEdit(self.centralwidget)
         font = QtGui.QFont()
         font.setFamily("微软雅黑")
         font.setPointSize(12)
-        self.Rec_out.setFont(font)
-        self.Rec_out.setObjectName("Rec_out")
-        self.verticalLayout.addWidget(self.Rec_out)
-        self.Ans = QtWidgets.QTextBrowser(self.centralwidget)
-        self.Ans.setObjectName("Ans")
-        self.verticalLayout.addWidget(self.Ans)
+        self.result.setFont(font)
+        self.result.setObjectName("result")
+        self.verticalLayout.addWidget(self.result)
+        self.answer = QtWidgets.QTextBrowser(self.centralwidget)
+        self.answer.setObjectName("answer")
+        self.verticalLayout.addWidget(self.answer)
         self.verticalLayout.setStretch(0, 1)
-        self.verticalLayout.setStretch(1, 10)
+        self.verticalLayout.setStretch(1, 7)
         self.verticalLayout.setStretch(2, 10)
         self.horizontalLayout.addLayout(self.verticalLayout)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -62,7 +62,7 @@ class Ui_MainWindow(object):
         self.mode1.setText(_translate("MainWindow", "挑战答题"))
         self.mode2.setText(_translate("MainWindow", "争上游答题"))
         self.mode3.setText(_translate("MainWindow", "双人对战"))
-        self.Ans.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+        self.answer.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'SimSun\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
