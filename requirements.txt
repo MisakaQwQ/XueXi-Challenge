@@ -3,5 +3,4 @@ opencv-python
 peewee
 Pillow
 PyQt5
-pytesseract
 scikit-image

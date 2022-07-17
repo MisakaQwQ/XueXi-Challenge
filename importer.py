@@ -5,7 +5,7 @@ from playhouse.shortcuts import model_to_dict
 all_ques = []
 
 def chk_indb(question):
-    # return True
+    return True
     score = 0
     suspect = ''
     for each in all_ques:
@@ -25,6 +25,11 @@ def chk_indb(question):
 
 def run():
     db.connect()
+    try:
+        db.create_tables([Questions])
+    except Exception as e:
+        print(e)
+        pass
     cursor = Questions.select()
     for each in cursor:
         all_ques.append(each.question)
@@ -33,46 +38,24 @@ def run():
     ans = '1'
     cnt = 1
 
-    with open('1.txt', 'r', encoding='utf-8') as f:
-        line = f.readline()
-        while line:
-            line = line.strip()
-            while line == '' or line.startswith('出题'):
-                line = f.readline().strip()
-            if line.startswith('正确答案：'):
-                ans = line[line.find('：') + 1:line.find('：') + 2]
-                ans = ord(ans) - ord('A') + 1
-                Q = Questions(question=question, answer=ans, choice1=choice[0], choice2=choice[1], choice3=choice[2], choice4=choice[3])
-                print(model_to_dict(Q))
-                if chk_indb(question):
-                    all_ques.append(question)
-                    Q.save()
-                question = ''
-                choice = ['', '', '', '']
-                ans = '1'
-                cnt = 1
-            elif line[0].isdigit():
-                question = line[line.find('：') + 1:]
-                # end = -1
-                # end = question.find('(推荐')
-                # if end != -1:
-                #     question = question[:end]
-                # end = question.find('(出题')
-                # if end != -1:
-                #     question = question[:end]
-                # end = question.find('出题:')
-                # if end != -1:
-                #     question = question[:end]
-                # end = question.find('出题：')
-                # if end != -1:
-                #     question = question[:end]
-                # end = question.find('（出题')
-                # if end != -1:
-                #     question = question[:end]
-            elif line[0].isalpha():
-                choice[cnt - 1] = line[line.find('.') + 1:]
-                cnt += 1
-            line = f.readline()
+    with open('2.txt', 'r', encoding='utf-8') as f:
+        while True:
+            tmp = f.readline()
+            if tmp.strip() == 'EOF':
+                break
+            question = tmp.strip()
+            choice = ['', '', '', '']
+            choicecnt = int(f.readline().strip())
+            for _ in range(choicecnt):
+                choice[_] = f.readline().strip()
+            ans = f.readline().strip()
+            ans = ord(ans) - ord('A') + 1
+            Q = Questions(question=question, answer=ans, choice1=choice[0], choice2=choice[1], choice3=choice[2],
+                          choice4=choice[3])
+            print(model_to_dict(Q))
+            Q.save()
+
 
 if __name__ == '__main__':
+    # exit(0)
     run()

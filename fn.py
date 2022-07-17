@@ -17,6 +17,7 @@ from playhouse.shortcuts import model_to_dict
 import difflib
 
 all_questions = []
+question_text = []
 ocr = CnOcr()
 
 
@@ -30,6 +31,7 @@ def init():
     cursor = Questions.select()
     for each in cursor:
         all_questions.append(model_to_dict(each))
+        question_text.append(all_questions[-1]['question'])
 
 
 def find_closest_question(question):
@@ -55,6 +57,7 @@ class OCR_backend(QThread):
         self.mutex = QMutex()
         self.cond = QWaitCondition()
 
+    @timer
     def search_db(self):
         def builder(font_size, color, font_family, content):
             html = '''<span style="font-size:%dpx;color:%s;font-family:'%s';"> %s <br /><br /></span>''' \
@@ -127,7 +130,7 @@ class OCR_backend(QThread):
             cv2.rectangle(self.image, (top_left[0], top_left[1]), (bot_right[0], bot_right[1]), (0, 0, 0))
             cnt += 1
             self.ocr_text += '\n'
-        cv2.imwrite('split.png', self.image.copy())
+        # cv2.imwrite('split.png', self.image.copy())
         self.update_rec.emit(self.ocr_text)
 
     def start_working(self, image):
@@ -160,13 +163,9 @@ class Main_backend(QThread):
     tpl1 = None
     mode = 1
 
-    ocr_cnt = 0
-    ocr_block = False
-
     def __init__(self, parent=None):
         super(Main_backend, self).__init__(parent)
         self.tpl1 = cv2.imread("data/Pos1.png")
-        self.ocr_block = True
         self.ocr_backend = OCR_backend(self)
         self.ocr_backend.update_rec.connect(self.handleRec)
         self.ocr_backend.update_ans.connect(self.handleAns)
@@ -181,7 +180,6 @@ class Main_backend(QThread):
         self.update_ans.emit(data)
 
     def handleRec(self, data):
-        self.ocr_block = False
         self.update_rec.emit(data)
 
     def start_ocr(self, rec_image):
@@ -217,13 +215,13 @@ class Main_backend(QThread):
     def image_process(self, image):
         wrapped_image = self.image_wrap(image)
         if self.mode == 1:
-            threshold = 0.97
+            threshold = 0.85
             horizon_margin = 0.05
             horizon_size = 0.85
             vertical_margin = 0.16
             vertical_size = 0.75
         else:
-            threshold = 0.97
+            threshold = 0.85
             horizon_margin = 0.07
             horizon_size = 0.85
             vertical_margin = 0.06
@@ -268,7 +266,7 @@ class Main_backend(QThread):
                 labeled_image = Image.fromarray(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
                 labeled_image = ImageQt.ImageQt(labeled_image)
                 self.update_img.emit(labeled_image.copy())
-                time.sleep(1 / 15)
+                time.sleep(1 / 50)
             except Exception as e:
                 print(e)
 

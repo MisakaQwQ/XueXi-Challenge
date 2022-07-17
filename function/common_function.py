@@ -1,15 +1,23 @@
 from functools import wraps
 import time
 import win32gui
+from collections import defaultdict
+
+
+prev_call = defaultdict(float)
+translator = {'image_process': '刷新帧速率', 'process': '识别帧速率', 'search_db': '查询速率'}
 
 
 def timer(func):
+    global prev_call
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.time()
         ret = func(*args, **kwargs)
         end = time.time()
-        print(func.__name__, end - start)
+        print(translator[func.__name__], end - start, 1 / (start - prev_call[func.__name__]))
+        prev_call[func.__name__] = start
         return ret
 
     return wrapper
