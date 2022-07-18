@@ -57,7 +57,7 @@ class OCR_backend(QThread):
         self.mutex = QMutex()
         self.cond = QWaitCondition()
 
-    @timer
+    # @timer
     def search_db(self):
         def builder(font_size, color, font_family, content):
             html = '''<span style="font-size:%dpx;color:%s;font-family:'%s';"> %s <br /><br /></span>''' \
@@ -84,7 +84,7 @@ class OCR_backend(QThread):
                    'p, li { white-space: pre-wrap; }</style></head><body> %s </body></html>' % html
         self.update_ans.emit(end_html)
 
-    @timer
+    # @timer
     def process(self):
         # 二值化
         ret, binary = cv2.threshold(self.image, 0, 255, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
@@ -123,7 +123,7 @@ class OCR_backend(QThread):
             pic = self.image[top_left[1]:bot_right[1], top_left[0]:bot_right[0]]
             text = ocr.ocr(pic)
             for each in text:
-                self.ocr_text += ''.join(each)
+                self.ocr_text += ''.join(each[0])
             if cnt == 0:
                 self.search_db()
             # cv2.imwrite(str(cnt)+'.png', pic)
@@ -211,7 +211,7 @@ class Main_backend(QThread):
         wrapped_image = image[left_up[1]:right_bot[1] + 1, left_up[0]:right_bot[0] + 1]
         return wrapped_image
 
-    @timer
+    # @timer
     def image_process(self, image):
         wrapped_image = self.image_wrap(image)
         if self.mode == 1:
