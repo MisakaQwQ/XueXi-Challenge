@@ -3,7 +3,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 from ocr.cn_ocr import CnOcr
-from qgmodel import *
 from UI.ui import Ui_MainWindow
 from function.common_function import *
 
@@ -13,7 +12,6 @@ import math
 from PIL import Image, ImageQt
 import cv2
 import numpy as np
-from playhouse.shortcuts import model_to_dict
 import difflib
 import json
 
@@ -23,16 +21,6 @@ ocr = CnOcr(context='gpu', model_backend='pytorch')
 
 def init():
     global all_questions
-    # db.connect()
-    # try:
-    #     db.create_tables([Questions])
-    # except Exception as e:
-    #     print(e)
-    #     pass
-    # cursor = Questions.select()
-    # for each in cursor:
-    #     all_questions.append(model_to_dict(each))
-    #
     with open('./TiKu/题库_排序版.json', 'r', encoding='utf-8') as fp:
         questions = json.load(fp)
 
