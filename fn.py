@@ -3,7 +3,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 from ocr.cn_ocr import CnOcr
-from qgmodel import *
 from UI.ui import Ui_MainWindow
 from function.common_function import *
 
@@ -13,25 +12,42 @@ import math
 from PIL import Image, ImageQt
 import cv2
 import numpy as np
-from playhouse.shortcuts import model_to_dict
 import difflib
+import json
 
 all_questions = []
-question_text = []
-ocr = CnOcr()
+ocr = CnOcr(context='gpu', model_backend='pytorch')
 
 
 def init():
-    db.connect()
-    try:
-        db.create_tables([Questions])
-    except Exception as e:
-        print(e)
-        pass
-    cursor = Questions.select()
-    for each in cursor:
-        all_questions.append(model_to_dict(each))
-        question_text.append(all_questions[-1]['question'])
+    global all_questions
+    with open('./TiKu/题库_排序版.json', 'r', encoding='utf-8') as fp:
+        questions = json.load(fp)
+
+    for key, value in questions.items():
+        tmp = key.split('|')
+        one_question = {
+            'question': tmp[0],
+            'answer': 0,
+            'choice1': tmp[1],
+            'choice2': tmp[2],
+            'choice3': '',
+            'choice4': ''
+        }
+        if len(tmp) >= 4:
+            one_question['choice3'] = tmp[3]
+        if len(tmp) >= 5:
+            one_question['choice4'] = tmp[4]
+        if one_question['choice1'] == value:
+            one_question['answer'] = 1
+        elif one_question['choice2'] == value:
+            one_question['answer'] = 2
+        elif one_question['choice3'] == value:
+            one_question['answer'] = 3
+        elif one_question['choice4'] == value:
+            one_question['answer'] = 4
+        all_questions.append(one_question)
+    pass
 
 
 def find_closest_question(question):
@@ -73,7 +89,7 @@ class OCR_backend(QThread):
         for i in range(1, 5):
             if all_questions[score[1]]['choice' + str(i)] == '':
                 break
-            if all_questions[score[1]]['answer'] == str(i):
+            if str(all_questions[score[1]]['answer']) == str(i):
                 html += builder(
                     20, '#ff00ff', '楷体', (chr(ord('A') + i - 1) + '.  ' + all_questions[score[1]]['choice' + str(i)]))
             else:
@@ -123,7 +139,7 @@ class OCR_backend(QThread):
             pic = self.image[top_left[1]:bot_right[1], top_left[0]:bot_right[0]]
             text = ocr.ocr(pic)
             for each in text:
-                self.ocr_text += ''.join(each)
+                self.ocr_text += ''.join(each[0])
             if cnt == 0:
                 self.search_db()
             # cv2.imwrite(str(cnt)+'.png', pic)
@@ -266,7 +282,7 @@ class Main_backend(QThread):
                 labeled_image = Image.fromarray(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
                 labeled_image = ImageQt.ImageQt(labeled_image)
                 self.update_img.emit(labeled_image.copy())
-                time.sleep(1 / 50)
+                time.sleep(1 / 100)
             except Exception as e:
                 print(e)
 

@@ -1,0 +1,3 @@
+[submodule "TiKu"]
+	path = TiKu
+	url = https://github.com/mondayfirst/XXQG_TiKu

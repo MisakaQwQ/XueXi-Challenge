@@ -5,7 +5,7 @@ from collections import defaultdict
 
 
 prev_call = defaultdict(float)
-translator = {'image_process': '刷新帧速率', 'process': '识别帧速率', 'search_db': '查询速率'}
+translator = {'image_process': '刷新帧耗时', 'process': '识别帧耗时', 'search_db': '查询耗时'}
 
 
 def timer(func):
@@ -16,7 +16,7 @@ def timer(func):
         start = time.time()
         ret = func(*args, **kwargs)
         end = time.time()
-        print(translator[func.__name__], end - start, 1 / (start - prev_call[func.__name__]))
+        print('%s %.3f %.3f FPS' % (translator[func.__name__], end - start, 1 / (start - prev_call[func.__name__])))
         prev_call[func.__name__] = start
         return ret
 
