@@ -15,3 +15,4 @@
 
 20210301 update：调整线程逻辑、可以在UI上直接切换答题模式了
 
+20220920 update: 题库使用[mondayfirst / XXQG_TiKu](https://github.com/mondayfirst/XXQG_TiKu)
