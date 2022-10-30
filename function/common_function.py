@@ -2,22 +2,45 @@ from functools import wraps
 import time
 import win32gui
 from collections import defaultdict
+import os
 
-
-prev_call = defaultdict(float)
-translator = {'image_process': '刷新帧耗时', 'process': '识别帧耗时', 'search_db': '查询耗时'}
+call_timer = [['刷新帧', 0, []], ['识别帧', 0, []], ['查询帧', 0, []]]
+for i in range(3):
+    call_timer[i][2] = [time.time() - i for i in range(31)]
 
 
 def timer(func):
-    global prev_call
+    global call_timer
 
     @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.time()
         ret = func(*args, **kwargs)
         end = time.time()
-        print('%s %.3f %.3f FPS' % (translator[func.__name__], end - start, 1 / (start - prev_call[func.__name__])))
-        prev_call[func.__name__] = start
+        if func.__name__ == 'image_process':
+            it = 0
+        elif func.__name__ == 'process':
+            it = 1
+        elif func.__name__ == 'search_db':
+            it = 2
+        call_timer[it][1] = end - start
+
+        call_timer[it][2].insert(0, start)
+        call_timer[it][2].pop()
+
+        info = []
+        for i in range(3):
+            prev5 = 5 / (call_timer[i][2][0] - call_timer[i][2][5])
+            prev10 = 10 / (call_timer[i][2][0] - call_timer[i][2][10])
+            prev30 = 30 / (call_timer[i][2][0] - call_timer[i][2][30])
+            info.append('%s %.2f [%.2f/%.2f/%.2f]' %
+                        (call_timer[i][0],
+                         call_timer[i][1],
+                         prev5,
+                         prev10,
+                         prev30
+                         ))
+        print('%s' % ('    '.join(info)))
         return ret
 
     return wrapper
