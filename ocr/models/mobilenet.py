@@ -22,7 +22,8 @@ from functools import partial
 from typing import Any, List, Optional, Callable
 
 from torch import nn, Tensor
-from torchvision.models.mobilenetv2 import ConvBNActivation
+from torchvision.ops.misc import ConvNormActivation as ConvBNActivation
+# from torchvision.models.mobilenetv2 import ConvBNActivation
 from torchvision.models import mobilenetv3
 from torchvision.models.mobilenetv3 import InvertedResidualConfig
 
