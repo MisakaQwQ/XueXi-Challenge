@@ -16,7 +16,10 @@ import difflib
 import json
 
 all_questions = []
-ocr = CnOcr(context='gpu', model_backend='pytorch')
+print('加载识别onnx模型...', end='')
+ocr = CnOcr(model_backend='onnx')
+_ = ocr.ocr('split.png')
+print('完成')
 
 
 def init():
@@ -168,7 +171,7 @@ class OCR_backend(QThread):
                 except Exception as e:
                     print(e)
                 self.available = True
-            self.msleep(100)
+            self.msleep(20)
             self.mutex.unlock()
 
 

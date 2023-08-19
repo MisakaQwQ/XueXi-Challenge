@@ -29,7 +29,6 @@ from .consts import MODEL_VERSION, AVAILABLE_MODELS, VOCAB_FP
 from .utils import data_dir, read_img
 from .line_split import line_split
 from .recognizer import Recognizer
-from .ppocr import PPRecognizer, PP_SPACE
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +41,8 @@ class CnOcr(object):
         model_name: str = 'densenet_lite_136-fc',
         *,
         cand_alphabet: Optional[Union[Collection, str]] = None,
-        context: str = 'cpu',  # ['cpu', 'gpu', 'cuda']
         model_fp: Optional[str] = None,
-        model_backend: str = 'onnx',  # ['pytorch', 'onnx']
+        model_backend: Optional[str] = 'onnx', # ['onnx', 'pytorch']
         root: Union[str, Path] = data_dir(),
         vocab_fp: Union[str, Path] = VOCAB_FP,
         **kwargs,
@@ -78,23 +76,18 @@ class CnOcr(object):
             >>> ocr = CnOcr(model_name='densenet_lite_136-fc', cand_alphabet='0123456789')
 
         """
-        self.space = AVAILABLE_MODELS.get_space(model_name, model_backend)
-        if self.space == AVAILABLE_MODELS.CNOCR_SPACE:
-            rec_cls = Recognizer
-        elif self.space == PP_SPACE:
-            rec_cls = PPRecognizer
-            if vocab_fp is not None and vocab_fp != VOCAB_FP:
-                logger.warning('param `vocab_fp` is invalid for %s models' % PP_SPACE)
+        if torch.cuda.is_available():
+            context = 'gpu'
         else:
-            raise NotImplementedError(
-                '%s is not supported currently' % ((model_name, model_backend),)
-            )
+            context = 'cpu'
+        rec_cls = Recognizer
 
         self.rec_model = rec_cls(
             model_name=model_name,
             cand_alphabet=cand_alphabet,
             context=context,
             model_fp=model_fp,
+            model_backend=model_backend,
             root=root,
             vocab_fp=vocab_fp,
         )

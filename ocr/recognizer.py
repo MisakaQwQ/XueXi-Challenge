@@ -184,7 +184,7 @@ class Recognizer(object):
         elif self._model_backend == 'onnx':
             import onnxruntime
 
-            model = onnxruntime.InferenceSession(self._model_fp)
+            model = onnxruntime.InferenceSession(self._model_fp, providers=['CUDAExecutionProvider'])
         else:
             raise NotImplementedError(f'{self._model_backend} is not supported yet')
 

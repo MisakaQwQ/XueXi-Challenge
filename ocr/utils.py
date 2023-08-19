@@ -86,11 +86,6 @@ def data_dir_default():
 
     :return: default data directory depending on the platform and environment variables
     """
-    # system = platform.system()
-    # if system == 'Windows':
-    #     return os.path.join(os.environ.get('APPDATA'), 'cnocr')
-    # else:
-    #     return os.path.join(os.path.expanduser("~"), '.cnocr')
     return os.path.join(os.path.abspath('.'), 'ocr', 'pretrained')
 
 
@@ -99,7 +94,7 @@ def data_dir():
 
     :return: data directory in the filesystem for storage, for example when downloading models
     """
-    return os.getenv('CNOCR_HOME', data_dir_default())
+    return data_dir_default()
 
 
 def check_model_name(model_name):
